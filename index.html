@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AI Creative Agent</title>
+</head>
+<body>
+  <p id="status" role="status" aria-live="polite">채팅에 연결하는 중입니다...</p>
+  <div id="webchat" style="height: 600px"></div>
+  <script src="https://cdn.botframework.com/botframework-webchat/4.18.0/webchat.js"></script>
+  <script>
+    const BROKER_URL = "https://dl-broker-juwon-4jt3z.azurewebsites.net/api/directlineToken";
+    const SEALED = "lFO5Ak3BgXCfPpEyYnB3wb9Ls1Hrh1htICF1pQ2QGZ2TPCUPa0MYmpsqGc6t2JJJ9Ef_LekWzqAMNM4k458G9amnQwDD8bFX9wJ2GnQ5H3HnrprRQUBeFcvkIltncehNHIbN50DxZf3hlZmKbaEaX0_4QyqUA40Hcf0NX9jf1K-pNApsqrUnYSV2-JygPTxYt1GaQZAhqkNQKeD24aLVrLC6tcu3UtxW68wfXQnVomRt6jZrEfluvHKG-J7an1tmU-C2n4CA9GyGfEvdhrQq2DPKN44dhyKRCxhLq3lwXzJWlJCePuJAXdvspphU8zUS6XokaRbl01MEbWVL6oN8v0JpbUWWFJ2A7dhX1ueYaAGcLb36Qtq0KGmCY2Vs5gfuCWaplCGanU6gnVvhUTnALrD051Z61Ha37vUCKWITrhwzyMnliyjMeVg3bMirmOGUHcooUmUFjpz4F-_beM176b7Zi16A3CYkqzy_fNoI7dDuFHJCCn0lT29m3SCo1hZe0IQ23LzwbE2t34dfEpoLTN2qWnEk5kz_LHyCJFOTkTdzn1suMJfRuBFJD6Xs7SaNQTB2sOcklO786Xa3eElV3N-Iia3naAouegjlAM9nBBNT1eisGcNiBrGhu0nLJ-iIXbY8qWJVKZfJFVc";
+    const status = document.getElementById("status");
+
+    function showError(message) {
+      status.hidden = false;
+      status.textContent = message;
+    }
+
+    async function connect() {
+      if (!window.WebChat ||
+          typeof WebChat.createDirectLine !== "function" ||
+          typeof WebChat.renderWebChat !== "function") {
+        showError("채팅 구성 요소를 불러오지 못했습니다. 네트워크를 확인한 뒤 새로고침해 주세요.");
+        return;
+      }
+
+      let response;
+      try {
+        // Keep this a simple CORS request; the broker may not support preflight.
+        response = await fetch(BROKER_URL, {
+          method: "POST",
+          body: JSON.stringify({ sealed: SEALED })
+        });
+      } catch {
+        showError("서버에 연결하지 못했습니다. 네트워크와 배포 주소를 확인해 주세요.");
+        return;
+      }
+      if (!response.ok) {
+        showError("서버가 연결 요청을 처리하지 못했습니다 (HTTP " + response.status + ").");
+        return;
+      }
+
+      let data;
+      try {
+        data = await response.json();
+      } catch {
+        showError("서버 응답을 읽을 수 없습니다. 잠시 후 다시 시도해 주세요.");
+        return;
+      }
+      if (!data || typeof data.token !== "string" || !data.token.trim()) {
+        showError("서버에서 연결 토큰을 받지 못했습니다. 암호와 배포 주소를 확인해 주세요.");
+        return;
+      }
+
+      try {
+        const directLine = WebChat.createDirectLine({ token: data.token });
+        status.hidden = true;
+        directLine.postActivity({
+          type: "event", name: "startConversation", from: { id: "user" }
+        }).subscribe({
+          error: () => showError("첫 인사를 요청하지 못했습니다. 채팅창에 메시지를 입력해 주세요.")
+        });
+        WebChat.renderWebChat({ directLine, locale: "ko-KR" }, document.getElementById("webchat"));
+      } catch {
+        showError("채팅을 시작하지 못했습니다. 새로고침 후 다시 시도해 주세요.");
+      }
+    }
+
+    connect();
+  </script>
+</body>
+</html>
